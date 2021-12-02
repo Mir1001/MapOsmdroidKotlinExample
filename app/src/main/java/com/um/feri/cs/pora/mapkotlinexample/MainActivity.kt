@@ -67,7 +67,6 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.INTERNET
         )
         activityResultLauncher.launch(appPerms)
-
     }
 
     override fun onResume() {
@@ -90,8 +89,8 @@ class MainActivity : AppCompatActivity() {
     private fun getPath(): Polyline { //Singelton
         if (path1 == null) {
             path1 = Polyline()
-            path1!!.color = Color.RED
-            path1!!.width = 10f
+            path1!!.outlinePaint.color = Color.RED
+            path1!!.outlinePaint.strokeWidth = 10f
             path1!!.addPoint(startPoint.clone())
             map.overlayManager.add(path1)
         }
