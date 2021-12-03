@@ -9,6 +9,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.um.feri.cs.pora.mapkotlinexample.databinding.ActivityMainBinding
 import org.osmdroid.api.IMapController
 import org.osmdroid.config.Configuration
@@ -24,6 +25,7 @@ import java.util.*
 
 class MainActivity : AppCompatActivity() {
     private var activityResultLauncher: ActivityResultLauncher<Array<String>>
+    private lateinit var fusedLocationClient: FusedLocationProviderClient //https://developer.android.com/training/location/retrieve-current
 
     init {
         this.activityResultLauncher = registerForActivityResult(
