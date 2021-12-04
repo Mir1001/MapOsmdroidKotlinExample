@@ -1,15 +1,18 @@
 package com.um.feri.cs.pora.mapkotlinexample
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.location.Location
 import android.os.Bundle
+import android.os.Looper
 import android.view.View
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.*
 import com.um.feri.cs.pora.mapkotlinexample.databinding.ActivityMainBinding
 import org.osmdroid.api.IMapController
 import org.osmdroid.config.Configuration
@@ -26,8 +29,22 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
     private var activityResultLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var fusedLocationClient: FusedLocationProviderClient //https://developer.android.com/training/location/retrieve-current
-
+    private var lastLoction: Location? = null
+    private var locationCallback: LocationCallback
+    private lateinit var locationRequest: LocationRequest
+    private var requestingLocationUpdates=false
     init {
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult?) {
+                locationResult ?: return
+                for (location in locationResult.locations) {
+                    // Update UI with location data
+                    updateLocation(location) //MY function
+                }
+            }
+        }
+
         this.activityResultLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { result ->
@@ -78,10 +95,63 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        if (requestingLocationUpdates) {
+            requestingLocationUpdates = false
+            stopLocationUpdates()
+        }
         binding.map.onPause()
     }
 
+    fun initLoaction() { //call in create
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        readLastKnownLocation()
+    }
+    private fun stopLocationUpdates() { //onPause
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+    @SuppressLint("MissingPermission")
+    private fun startLocationUpdates() { //onResume
+        locationRequest = LocationRequest.create().apply { //https://stackoverflow.com/questions/66489605/is-constructor-locationrequest-deprecated-in-google-maps-v2
+            interval = 1000 //can be much higher
+            fastestInterval = 500
+            smallestDisplacement = 10f //10m
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+            maxWaitTime= 1000
+        }
+        fusedLocationClient.requestLocationUpdates(locationRequest,
+            locationCallback,
+            Looper.getMainLooper())
+    }
+
+    fun updateLocation(newLocation: Location) {
+        lastLoction = newLocation
+        //GUI TODO
+        binding.tvLat.setText(newLocation.latitude.toString())
+        binding.tvLon.setText(newLocation.longitude.toString())
+        //var currentPoint: GeoPoint = GeoPoint(newLocation.latitude, newLocation.longitude);
+        startPoint.longitude = newLocation.longitude
+        startPoint.latitude = newLocation.latitude
+        mapController.setCenter(startPoint)
+        getPositionMarker().position = startPoint
+        map.invalidate()
+
+    }
+
+    //https://developer.android.com/training/location/retrieve-current
+    @SuppressLint("MissingPermission") //permission are checked before
+    fun readLastKnownLocation() {
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location: Location? ->
+                location?.let { updateLocation(it) }
+            }
+    }
+
     fun initMap() {
+        initLoaction()
+        if (!requestingLocationUpdates) {
+            requestingLocationUpdates = true
+            startLocationUpdates()
+        }
         mapController.setZoom(18.5)
         mapController.setCenter(startPoint);
         map.invalidate()

@@ -19,7 +19,7 @@
 
     <LinearLayout
         android:id="@+id/linearLayout"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
         android:orientation="vertical"
@@ -65,26 +65,34 @@
             android:layout_height="wrap_content">
 
             <Button
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
                 android:onClick="onClickDraw1"
                 android:text="Marker" />
 
             <Button
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
                 android:onClick="onClickDraw2"
                 android:text="Area" />
 
             <Button
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
                 android:onClick="onClickDraw3"
                 android:text="Com." />
 
             <Button
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="12sp"
                 android:onClick="onClickDraw4"
                 android:text="Path" />
 
