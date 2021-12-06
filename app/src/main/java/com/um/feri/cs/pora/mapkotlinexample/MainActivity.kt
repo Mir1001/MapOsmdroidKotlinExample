@@ -142,6 +142,7 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
         EventBus.getDefault().unregister(this);
     }
+
     @Subscribe(threadMode = ThreadMode.MAIN)
     fun onMsg(status: MyEventLocationSettingsChange) {
         if (status.on) {
@@ -156,18 +157,26 @@ class MainActivity : AppCompatActivity() {
         readLastKnownLocation()
     }
 
-    private fun stopLocationUpdates() { //onPause
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-    }
-
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() { //onResume
-
         fusedLocationClient.requestLocationUpdates(
             locationRequest,
             locationCallback,
             Looper.getMainLooper()
         )
+    }
+
+    private fun stopLocationUpdates() { //onPause
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+
+    //https://developer.android.com/training/location/retrieve-current
+    @SuppressLint("MissingPermission") //permission are checked before
+    fun readLastKnownLocation() {
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location: Location? ->
+                location?.let { updateLocation(it) }
+            }
     }
 
     fun initCheckLocationSettings() {
@@ -229,14 +238,6 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    //https://developer.android.com/training/location/retrieve-current
-    @SuppressLint("MissingPermission") //permission are checked before
-    fun readLastKnownLocation() {
-        fusedLocationClient.lastLocation
-            .addOnSuccessListener { location: Location? ->
-                location?.let { updateLocation(it) }
-            }
-    }
 
     fun initMap() {
         initLoaction()
