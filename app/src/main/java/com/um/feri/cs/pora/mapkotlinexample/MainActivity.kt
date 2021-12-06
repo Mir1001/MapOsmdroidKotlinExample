@@ -2,9 +2,10 @@ package com.um.feri.cs.pora.mapkotlinexample
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.Context
+import android.content.*
 import android.graphics.Color
 import android.location.Location
+import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import android.view.View
@@ -12,8 +13,15 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
+import com.google.android.gms.tasks.Task
 import com.um.feri.cs.pora.mapkotlinexample.databinding.ActivityMainBinding
+import com.um.feri.cs.pora.mapkotlinexample.location.LocationProviderChangedReceiver
+import com.um.feri.cs.pora.mapkotlinexample.location.MyEventLocationSettingsChange
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
+import org.greenrobot.eventbus.ThreadMode
 import org.osmdroid.api.IMapController
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -24,6 +32,7 @@ import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.compass.CompassOverlay
 import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
+import timber.log.Timber
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
@@ -31,10 +40,22 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient //https://developer.android.com/training/location/retrieve-current
     private var lastLoction: Location? = null
     private var locationCallback: LocationCallback
-    private lateinit var locationRequest: LocationRequest
-    private var requestingLocationUpdates=false
-    init {
+    private var locationRequest: LocationRequest
+    private var requestingLocationUpdates = false
 
+    companion object {
+        val REQUEST_CHECK_SETTINGS = 20202
+    }
+
+    init {
+        locationRequest = LocationRequest.create()
+            .apply { //https://stackoverflow.com/questions/66489605/is-constructor-locationrequest-deprecated-in-google-maps-v2
+                interval = 1000 //can be much higher
+                fastestInterval = 500
+                smallestDisplacement = 10f //10m
+                priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+                maxWaitTime = 1000
+            }
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult?) {
                 locationResult ?: return
@@ -53,8 +74,10 @@ class MainActivity : AppCompatActivity() {
                 allAreGranted = allAreGranted && b
             }
 
+            Timber.d("Permissions granted $allAreGranted")
             if (allAreGranted) {
-                initMap()
+                initCheckLocationSettings()
+                //initMap() if settings are ok
             }
         }
     }
@@ -69,6 +92,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree()) //Init report type
+        }
+        val br: BroadcastReceiver = LocationProviderChangedReceiver()
+        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+        registerReceiver(br, filter)
+
+        //LocalBroadcastManager.getInstance(this).registerReceiver(locationProviderChange)
         Configuration.getInstance()
             .load(applicationContext, this.getPreferences(Context.MODE_PRIVATE))
         binding = ActivityMainBinding.inflate(layoutInflater) //ADD THIS LINE
@@ -102,30 +133,91 @@ class MainActivity : AppCompatActivity() {
         binding.map.onPause()
     }
 
+    override fun onStart() {
+        super.onStart()
+        EventBus.getDefault().register(this);
+    }
+
+    override fun onStop() {
+        super.onStop()
+        EventBus.getDefault().unregister(this);
+    }
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onMsg(status: MyEventLocationSettingsChange) {
+        if (status.on) {
+            initMap()
+        } else {
+            Timber.i("Stop something")
+        }
+    }
+
     fun initLoaction() { //call in create
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         readLastKnownLocation()
     }
+
     private fun stopLocationUpdates() { //onPause
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
+
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() { //onResume
-        locationRequest = LocationRequest.create().apply { //https://stackoverflow.com/questions/66489605/is-constructor-locationrequest-deprecated-in-google-maps-v2
-            interval = 1000 //can be much higher
-            fastestInterval = 500
-            smallestDisplacement = 10f //10m
-            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-            maxWaitTime= 1000
-        }
-        fusedLocationClient.requestLocationUpdates(locationRequest,
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
             locationCallback,
-            Looper.getMainLooper())
+            Looper.getMainLooper()
+        )
+    }
+
+    fun initCheckLocationSettings() {
+        val builder = LocationSettingsRequest.Builder()
+            .addLocationRequest(locationRequest)
+        val client: SettingsClient = LocationServices.getSettingsClient(this)
+        val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
+        task.addOnSuccessListener { locationSettingsResponse ->
+            Timber.d("Settings Location IS OK")
+            MyEventLocationSettingsChange.globalState = true //default
+            initMap()
+            // All location settings are satisfied. The client can initialize
+            // location requests here.
+            // ...
+        }
+
+        task.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException) {
+                // Location settings are not satisfied, but this can be fixed
+                // by showing the user a dialog.
+                Timber.d("Settings Location addOnFailureListener call settings")
+                try {
+                    // Show the dialog by calling startResolutionForResult(),
+                    // and check the result in onActivityResult().
+                    exception.startResolutionForResult(
+                        this@MainActivity,
+                        REQUEST_CHECK_SETTINGS
+                    )
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    // Ignore the error.
+                    Timber.d("Settings Location sendEx??")
+                }
+            }
+        }
+
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Timber.d("Settings onActivityResult for $requestCode result $resultCode")
+        if (requestCode == REQUEST_CHECK_SETTINGS) {
+            if (resultCode == RESULT_OK) {
+                initMap()
+            }
+        }
     }
 
     fun updateLocation(newLocation: Location) {
         lastLoction = newLocation
-        //GUI TODO
+        //GUI, MAP TODO
         binding.tvLat.setText(newLocation.latitude.toString())
         binding.tvLon.setText(newLocation.longitude.toString())
         //var currentPoint: GeoPoint = GeoPoint(newLocation.latitude, newLocation.longitude);
