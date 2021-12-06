@@ -90,16 +90,25 @@ class MainActivity : AppCompatActivity() {
     var marker: Marker? = null
     var path1: Polyline? = null
 
+    //BroadcastReceiver
+    val br: BroadcastReceiver = LocationProviderChangedReceiver()
+    val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
+    val brMy: BroadcastReceiver = MyBootReceiver()
+    val filterBoot = IntentFilter()
+
+    init {
+        //val filterBoot = IntentFilter("android.intent.action.BOOT_COMPLETED","android.intent.action.ACTION_BOOT_COMPLETED")
+        //LocalBroadcastManager.getInstance(this).registerReceiver(locationProviderChange)
+        filterBoot.addAction("android.intent.action.ACTION_BOOT_COMPLETED")
+        filterBoot.addAction("android.intent.action.BOOT_COMPLETED")
+        filterBoot.addAction(LocationManager.PROVIDERS_CHANGED_ACTION)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree()) //Init report type
         }
-        val br: BroadcastReceiver = LocationProviderChangedReceiver()
-        val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
-        registerReceiver(br, filter)
-
-        //LocalBroadcastManager.getInstance(this).registerReceiver(locationProviderChange)
         Configuration.getInstance()
             .load(applicationContext, this.getPreferences(Context.MODE_PRIVATE))
         binding = ActivityMainBinding.inflate(layoutInflater) //ADD THIS LINE
@@ -136,11 +145,16 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         EventBus.getDefault().register(this);
+        registerReceiver(br, filter)
+        registerReceiver(brMy, filterBoot)
+
     }
 
     override fun onStop() {
         super.onStop()
         EventBus.getDefault().unregister(this);
+        unregisterReceiver(br)
+        unregisterReceiver(brMy)
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -308,5 +322,6 @@ class MainActivity : AppCompatActivity() {
         getPath().addPoint(startPoint.clone())
         map.invalidate()
     }
+
 }
 

@@ -23,6 +23,13 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name="MyBootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_BOOT_COMPLETED" /> //IZMIŠLJEN
+                <action android:name="android.intent.action.BOOT_COMPLETED" /> //can simulate only on root device
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true">
